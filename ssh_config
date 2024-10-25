@@ -1,0 +1,5 @@
+Host ios
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    ProxyCommand=inetcat 22
+    User mobile
