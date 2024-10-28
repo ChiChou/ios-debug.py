@@ -6,15 +6,7 @@ Shortcut to automate your `iproxy`, `debugserver`, `lldb` workflow for research 
 
 ## Setup
 
-### Host Machine Prerequisites
-
-[Python 3](https://www.python.org/)
-
-Install [libimobiledevice](https://libimobiledevice.org/)
-
-```bash
-brew install libimobiledevice
-```
+### Prerequisites on host machine
 
 Ensure you have following commands available:
 
@@ -22,8 +14,6 @@ Ensure you have following commands available:
 * `iproxy`, `inetcat` from [libusbmuxd](https://github.com/libimobiledevice/libusbmuxd)
 * `ideviceinstaller` from [libimobiledevice](https://github.com/libimobiledevice/libimobiledevice)
 * `lldb` of course, from either Xcode or `brew install llvm`
-
-Those commands should be available on Linux as well.
 
 ### Setup research idevice
 
@@ -33,7 +23,7 @@ Those commands should be available on Linux as well.
 
     ```bash
     iPad:~ mobile% sudo passwd
-    [sudo] password for mobile: 
+    [sudo] password for mobile:
     Changing password for root.
     ```
 
@@ -70,7 +60,7 @@ Grab a copy of `debugserver` and save to `/var/root/debugserver` on your researc
     ```
 
 * Resign the binary with `ldid`:
-    
+
     ```bash
     ldid -S/tmp/entitlements.plist /usr/libexec/debugserver
     ```
