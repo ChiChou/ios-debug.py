@@ -80,7 +80,7 @@ async def main():
                         default=54321, help='Remote port for debugserver')
     args = parser.parse_args()
 
-    for cmd in ['ssh', 'iproxy', 'lldb']:
+    for cmd in ['ssh', 'iproxy', 'lldb', 'ideviceinstaller']:
         if not shutil.which(cmd):
             raise FileNotFoundError(f'{cmd} not found')
 
