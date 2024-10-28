@@ -1,6 +1,6 @@
 # ios-debug.py
 
-Command shortcut to debug process on research device
+Shortcut to automate your `iproxy`, `debugserver`, `lldb` workflow for research devices.
 
 ![screenshot](screen.png)
 
@@ -29,6 +29,14 @@ Those commands should be available on Linux as well.
 
 * Install OpenSSH
 
+* Set password for `root`
+
+    ```bash
+    iPad:~ mobile% sudo passwd
+    [sudo] password for mobile: 
+    Changing password for root.
+    ```
+
 ### Add ssh configuration
 
 * Add following configuration to `~/.ssh/config` on your host machine
@@ -43,6 +51,7 @@ Those commands should be available on Linux as well.
 
 * Run `ssh-copy-id ios`
 * From now, you can simply run `ssh ios` to access your research device
+* By adding `--udid` option to inetcat, you can setup multiple aliases for different devices
 
 ### Install debugserver on research device
 
@@ -75,10 +84,7 @@ Grab a copy of `debugserver` and save to `/var/root/debugserver` on your researc
 `ios-debug -h` for help
 
 * Attach to process by name: `ios-debug SpringBoard`
+* If you have more than one device: `ios-debug SpringBoard --udid 1234567890abcdef`
 * Attach to process by PID: `ios-debug 1234`
 * Debug app by bundle ID: `ios-debug --app com.apple.Preferences`
 * Use an alternative debugserver: `ios-debug --server /path/to/debugserver SpringBoard`
-
-## Todo
-
-The setup supports wireless connection too, but need to add options for `ideviceinstaller` and `iproxy` to make it work.

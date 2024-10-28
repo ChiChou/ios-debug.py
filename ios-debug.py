@@ -2,13 +2,13 @@
 
 import argparse
 import asyncio
+import plistlib
 import shlex
 import shutil
 import signal
 import sys
 
-
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional
 
 
 async def find_port():
@@ -16,7 +16,7 @@ async def find_port():
         pass
 
     server = await asyncio.start_server(empty_callback, '127.1', 0)
-    port = server.sockets[0].getsockname()[1]
+    _, port = server.sockets[0].getsockname()
     server.close()
     await server.wait_closed()
     return port
@@ -41,28 +41,59 @@ def ignore_signal(signum):
     return IgnoreSignal(signum)
 
 
-child_stdio: Dict[Literal['stdin', 'stdout', 'stderr'], int] = {
-    'stdin': asyncio.subprocess.PIPE,
-    'stdout': asyncio.subprocess.PIPE,
-    'stderr': asyncio.subprocess.PIPE,
-}
+class Tool:
+    udids: str | None
+    over_network: bool
+    server_port: int
 
+    idevice_args: list[str]
 
-async def get_app_path(bundle_name_or_id: str):
-    # todo: add --udid and --network options
-    installer = await asyncio.create_subprocess_exec(
-        'ideviceinstaller', '-l', '-o', 'xml', '-o', 'list_all', **child_stdio
-    )
-    stdout, _ = await installer.communicate()
+    child_stdio: Dict[Literal['stdin', 'stdout', 'stderr'], int] = {
+        'stdin': asyncio.subprocess.PIPE,
+        'stdout': asyncio.subprocess.PIPE,
+        'stderr': asyncio.subprocess.PIPE,
+    }
 
-    import plistlib
-    apps = plistlib.loads(stdout)
+    def __init__(self, port: int, udid: Optional[str], network: bool = False):
+        self.server_port = port
+        self.udid = udid
+        self.over_network = network
 
-    for app in apps:
-        if app.get('CFBundleName') == bundle_name_or_id or app.get('CFBundleIdentifier') == bundle_name_or_id:
-            return app['Path']
+        idevice_args = []
+        if udid:
+            idevice_args.extend(['-u', shlex.quote(udid)])
+        if network:
+            idevice_args.append('-n')
 
-    raise ValueError(f'App not found: {bundle_name_or_id}')
+        self.idevice_args = idevice_args
+
+        inetcat_flags = ' '.join(idevice_args)
+        inetcat_cmd = f'inetcat {inetcat_flags} 22'
+        self.ssh_args = [
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-o', f'ProxyCommand={inetcat_cmd}',
+        ]
+
+    async def get_app_path(self, bundle_name_or_id: str):
+        installer = await asyncio.create_subprocess_exec(
+            'ideviceinstaller', *self.idevice_args, '-l', '-o', 'xml', '-o', 'list_all', **self.child_stdio
+        )
+        stdout, _ = await installer.communicate()
+        apps = plistlib.loads(stdout)
+
+        for app in apps:
+            if app.get('CFBundleName') == bundle_name_or_id or app.get('CFBundleIdentifier') == bundle_name_or_id:
+                return app['Path']
+
+        raise ValueError(f'App not found: {bundle_name_or_id}')
+
+    async def ssh(self, *args):
+        return await asyncio.create_subprocess_exec('ssh', *self.ssh_args, *args, **self.child_stdio)
+
+    async def iproxy(self, local, remote):
+        return await asyncio.create_subprocess_exec('iproxy', *self.idevice_args, str(local), str(remote), **self.child_stdio)
 
 
 async def main():
@@ -74,6 +105,13 @@ async def main():
     group.add_argument('-f', '--spawn', metavar='PATH',
                        help='Spawn a new process at path (not recommended)')
     group.add_argument('target', help='target name or pid', nargs='?')
+
+    idevice_options = parser.add_argument_group()
+    idevice_options.add_argument(
+        '--udid', '-u', metavar='UDID', help='target specific device by UDID, default is first device connected via USB')
+    idevice_options.add_argument(
+        '--network', '-n', action='store_true', help='Connect to network device')
+
     parser.add_argument('--server', '-s', metavar='PATH', default='/var/root/debugserver',
                         help='Path to debugserver on jailbroken device')
     parser.add_argument('--port', '-p', metavar='PORT', type=int,
@@ -84,30 +122,24 @@ async def main():
         if not shutil.which(cmd):
             raise FileNotFoundError(f'{cmd} not found')
 
+    tool = Tool(args.port, args.udid, args.network)
     listen = '127.1:%d' % args.port
     debugserver = shlex.quote(args.server)
 
     if args.app:
-        app_path = await get_app_path(args.app)
+        app_path = await tool.get_app_path(args.app)
         cmd = f'{debugserver} -x backboard {listen} {shlex.quote(app_path)}'
     elif args.spawn:
         cmd = f'{debugserver} {listen} {shlex.quote(args.spawn)}'
     else:
         cmd = f'{debugserver} {listen} -a {shlex.quote(args.target)}'
 
-    local_port = await find_port()
-    lldb_script = [
-        '--one-line', f'process connect connect://127.1:{local_port}',
-        '--one-line', 'bt',
-        '--one-line', 'reg read'
-    ]
-
     # kill any existing debugserver
-    kill = await asyncio.create_subprocess_exec('ssh', 'root@ios', 'killall -9 debugserver', **child_stdio)
+    kill = await tool.ssh('root@', 'killall -9 debugserver')
     await kill.wait()
 
     # run debugserver over ssh
-    debugserver = await asyncio.create_subprocess_exec('ssh', '-tt', 'root@ios', cmd, **child_stdio)
+    debugserver = await tool.ssh('-tt', 'root@', cmd)
 
     if not debugserver.stdout:
         raise RuntimeError('Failed to start debugserver')
@@ -121,8 +153,14 @@ async def main():
         await debugserver.wait()
         sys.exit(1)
 
-    # run iproxy in the background
-    iproxy = await asyncio.create_subprocess_exec('iproxy', str(local_port), str(args.port), **child_stdio)
+    local_port = await find_port()
+    lldb_script = [
+        '--one-line', f'process connect connect://127.1:{local_port}',
+        '--one-line', 'bt',
+        '--one-line', 'reg read'
+    ]
+
+    iproxy = await tool.iproxy(local_port, args.port)
 
     with ignore_signal(signal.SIGINT):
         lldb = await asyncio.create_subprocess_exec('lldb', *lldb_script)
