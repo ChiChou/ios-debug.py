@@ -67,11 +67,12 @@ class Tool:
 
         self.idevice_args = idevice_args
 
+        dev_null = '\\\\.\\NUL' if sys.platform == 'win32' else '/dev/null'
         inetcat_flags = ' '.join(idevice_args)
         inetcat_cmd = f'inetcat {inetcat_flags} 22'
         self.ssh_args = [
             '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', f'UserKnownHostsFile={dev_null}',
             '-o', 'LogLevel=ERROR',
             '-o', f'ProxyCommand={inetcat_cmd}',
         ]
