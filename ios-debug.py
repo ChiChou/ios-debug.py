@@ -45,7 +45,7 @@ class Tool:
     udids: str | None
     over_network: bool
     server_port: int
-
+    is_windows: bool
     idevice_args: list[str]
 
     child_stdio: Dict[Literal['stdin', 'stdout', 'stderr'], int] = {
@@ -55,6 +55,11 @@ class Tool:
     }
 
     def __init__(self, port: int, udid: Optional[str], network: bool = False):
+        self.is_windows = sys.platform == 'win32'
+
+        if self.is_windows:
+            raise NotImplementedError('Windows is not supported yet')
+
         self.server_port = port
         self.udid = udid
         self.over_network = network
