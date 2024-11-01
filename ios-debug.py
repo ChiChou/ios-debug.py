@@ -81,7 +81,13 @@ class Tool:
         installer = await asyncio.create_subprocess_exec(
             'ideviceinstaller', *self.idevice_args, '-l', '-o', 'xml', '-o', 'list_all', **self.child_stdio
         )
-        stdout, _ = await installer.communicate()
+        stdout, stderr = await installer.communicate()
+        if b'--system' in stderr:  # nightly build
+            installer = await asyncio.create_subprocess_exec(
+                'ideviceinstaller', *self.idevice_args, 'list', '--xml', '--all', **self.child_stdio
+            )
+            stdout, stderr = await installer.communicate()
+
         apps = plistlib.loads(stdout)
 
         for app in apps:
@@ -148,8 +154,8 @@ async def main():
     try:
         await debugserver.stdout.readuntil(b'Listening to port')
     except asyncio.IncompleteReadError as err:
-        print('Failed to start debugserver, unexpected output:')
-        print(err.partial.decode())
+        sys.stderr.write('Failed to start debugserver, unexpected output:\n')
+        sys.stderr.write(err.partial.decode())
         debugserver.terminate()
         await debugserver.wait()
         sys.exit(1)
