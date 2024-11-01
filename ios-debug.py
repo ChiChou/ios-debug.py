@@ -15,8 +15,8 @@ async def find_port():
     async def empty_callback(*args):
         pass
 
-    server = await asyncio.start_server(empty_callback, '127.1', 0)
-    _, port = server.sockets[0].getsockname()
+    server = await asyncio.start_server(empty_callback, 'localhost', 0)
+    port = server.sockets[0].getsockname()[1]
     server.close()
     await server.wait_closed()
     return port
