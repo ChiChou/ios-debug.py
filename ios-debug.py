@@ -183,7 +183,6 @@ async def main():
         )
 
         iproxy.send_signal(signal.SIGINT)
-        # iproxy.terminate()
         await iproxy.wait()
 
 
