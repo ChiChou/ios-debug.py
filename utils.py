@@ -1,5 +1,12 @@
 import asyncio
 import signal
+import shutil
+
+
+def check_environment():
+    for cmd in ['ssh', 'iproxy', 'lldb', 'ideviceinstaller']:
+        if not shutil.which(cmd):
+            raise FileNotFoundError(f'{cmd} not found')
 
 
 async def find_port():

@@ -4,13 +4,12 @@ import argparse
 import asyncio
 import plistlib
 import shlex
-import shutil
 import signal
 import sys
 
 from typing import Dict, Literal, Optional
 
-from utils import find_port, ignore_signal
+from utils import find_port, ignore_signal, check_environment
 
 
 class Tool:
@@ -102,9 +101,7 @@ async def main():
                         default=54321, help='Remote port for debugserver')
     args = parser.parse_args()
 
-    for cmd in ['ssh', 'iproxy', 'lldb', 'ideviceinstaller']:
-        if not shutil.which(cmd):
-            raise FileNotFoundError(f'{cmd} not found')
+    check_environment()
 
     tool = Tool(args.port, args.udid, args.network)
     listen = '127.1:%d' % args.port
