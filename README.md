@@ -39,7 +39,7 @@ Ensure you have following commands available:
         User mobile
     ```
 
-* Run `ssh-copy-id ios`
+* Run `ssh-copy-id ios` and `ssh-copy-id root@ios` to setup passwordless login
 * From now, you can simply run `ssh ios` to access your research device
 * By adding `--udid` option to inetcat, you can setup multiple aliases for different devices
 
